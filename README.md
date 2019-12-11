@@ -1,7 +1,8 @@
 # **SensiBLE-1.0**
 
 ## 1 Build
-For build [IAR ver. EWARM-CD-8222-15996](https://www.iar.com/) is used.
+For build can be used [IAR ver. EWARM-CD-8222-15996](https://www.iar.com/) or [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html).
+Relevant projects can be found in [Projects/Multi/Applications/ALLMEMS1/EWARM/STM32L476RG-Nucleo](Projects/Multi/Applications/ALLMEMS1/EWARM/STM32L476RG-Nucleo) and [Projects/Multi/Applications/ALLMEMS1/CubeIDE/STM32L476RG-Nucleo/STM32L4xx-Nucleo](Projects/Multi/Applications/ALLMEMS1/CubeIDE/STM32L476RG-Nucleo/STM32L4xx-Nucleo).
 
 ## 2 License
 
