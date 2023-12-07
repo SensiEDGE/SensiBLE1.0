@@ -52,6 +52,7 @@
 #include "vbat.h"
 #endif // defined(SENSIBLE_VBAT) && defined(USE_SENSIBLE)
 #include "sensible_distance.h"
+#include "FlashManager.h"
 
 /* Exported variables ---------------------------------------------------------*/
 int connected = FALSE;
@@ -100,10 +101,10 @@ extern float DBNOISE_Value_Old_Ch[];
 extern uint16_t PCM_Buffer[];
 
 
-// extern void EnvSensorsEnable(void);
-// extern void MotionSensorsEnable(void);
-// extern void EnvSensorsDisable(void);
-// extern void MotionSensorsDisable(void);
+extern void EnvSensorsEnable(void);
+extern void MotionSensorsEnable(void);
+extern void EnvSensorsDisable(void);
+extern void MotionSensorsDisable(void);
 
 #ifdef USE_STM32F4XX_NUCLEO
 extern uint16_t PDM_Buffer[];
@@ -162,6 +163,7 @@ BV_ADPCM_uuid_t BLUEVOICE_Char_uuids;
 
 static uint16_t ConfigServW2STHandle;
 static uint16_t ConfigCharHandle;
+static uint16_t ConfigSensorCharHandle;
 
 static uint16_t ConsoleW2STHandle;
 static uint16_t TermCharHandle;
@@ -242,7 +244,7 @@ tBleStatus Add_ConfigW2ST_Service(void)
   uint8_t uuid[16];
 
   COPY_CONFIG_SERVICE_UUID(uuid);
-  ret = aci_gatt_add_serv(UUID_TYPE_128,  uuid, PRIMARY_SERVICE, 1+3,&ConfigServW2STHandle);
+  ret = aci_gatt_add_serv(UUID_TYPE_128,  uuid, PRIMARY_SERVICE, 1+3+2,&ConfigServW2STHandle);
 
   if (ret != BLE_STATUS_SUCCESS)
     goto fail;
@@ -254,6 +256,17 @@ tBleStatus Add_ConfigW2ST_Service(void)
                            GATT_NOTIFY_ATTRIBUTE_WRITE | GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
                            16, 1, &ConfigCharHandle);
   
+  if (ret != BLE_STATUS_SUCCESS) {
+    goto fail;
+  }
+
+  COPY_CONFIG_SENSOR_CHAR_UUID(uuid);
+  ret =  aci_gatt_add_char(ConfigServW2STHandle, UUID_TYPE_128, uuid, 20 /* Max Dimension */,
+                           CHAR_PROP_READ| CHAR_PROP_WRITE_WITHOUT_RESP,
+                           ATTR_PERMISSION_NONE,
+                           GATT_NOTIFY_ATTRIBUTE_WRITE |GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                           16, 1, &ConfigSensorCharHandle);
+
   if (ret != BLE_STATUS_SUCCESS) {
     goto fail;
   }
@@ -1406,6 +1419,42 @@ tBleStatus Uv_Update(uint16_t UvValue)
   return BLE_STATUS_SUCCESS;  
 }
 
+tBleStatus ConfigSensor_Update(void)
+{
+    tBleStatus ret;
+    FlashManegerData_t *structParam = NULL;
+    structParam = FlashManagerGetParam();
+
+    if (structParam == NULL) {
+        return BLE_STATUS_ERROR;
+    }
+
+    uint8_t buff[14] = {0};
+
+    buff[0] = structParam->mAccFullSc;
+    STORE_LE_16(buff + 1, structParam->mAccOdr);
+    STORE_LE_16(buff + 3, structParam->mGyroFullSc);
+    STORE_LE_16(buff + 5, structParam->mGyroOdr);
+    buff[7] = structParam->mMagFullSc;
+    STORE_LE_16(buff + 8, structParam->mMagOdr);
+    STORE_LE_16(buff + 10, structParam->mPressOdr);
+    STORE_LE_16(buff + 12, structParam->mHumTempOdr);
+
+    ret = ACI_GATT_UPDATE_CHAR_VALUE(ConfigServW2STHandle, ConfigSensorCharHandle, 0, sizeof(buff),buff);
+
+    if (ret != BLE_STATUS_SUCCESS){
+        if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_ERR)){
+          BytesToWrite = sprintf((char *)BufferToWrite, "Error Updating Config Sensor Char\r\n");
+          Stderr_Update(BufferToWrite,BytesToWrite);
+        } else {
+          printf("Error Updating Uv Char\r\n");
+        }
+        return BLE_STATUS_ERROR;
+    }
+    return BLE_STATUS_SUCCESS;
+}
+
+
 //tBleStatus Co_Update(uint32_t CoValue)
 //{ 
 //  tBleStatus ret;
@@ -1927,7 +1976,11 @@ void Read_Request_CB(uint16_t handle)
 
     GG_Update(soc, voltage, current);
 #endif /* STM32_SENSORTILE */
-  }
+  } else if (handle == ConfigSensorCharHandle + 1) {
+      ConfigSensor_Update();
+      MotionSensorsEnable();
+      EnvSensorsEnable();
+   }
 
   //EXIT:
   if(connection_handle != 0)
@@ -2525,6 +2578,8 @@ void Attribute_Modified_CB(uint16_t attr_handle, uint8_t * att_data, uint8_t dat
   } else if (attr_handle == ConfigCharHandle + 1) {
     /* Received one write command from Client on Configuration characteristc */
     ConfigCommandParsing(att_data, data_length);
+  } else if (attr_handle == ConfigSensorCharHandle + 1) {
+      FlashManagerSetParam(att_data, data_length);
   } else {
     if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_ERR)){
       BytesToWrite =sprintf((char *)BufferToWrite, "Notification UNKNOW handle\r\n");

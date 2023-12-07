@@ -171,6 +171,7 @@
 #include "sensible_distance.h"
 #include "x_nucleo_iks01a1_uv.h"
 #include "AT25XE041B_Driver.h"
+#include "FlashManager.h"
 #if defined(SENSIBLE_VBAT) && defined(USE_SENSIBLE)
 #include "vbat.h"
 #endif // defined(SENSIBLE_VBAT) && defined(USE_SENSIBLE)
@@ -374,7 +375,6 @@ uint32_t t_coin=0;
 * @param  None
 * @retval None
 */
-
 int main(void)
 { 
     HAL_Init();
@@ -471,17 +471,13 @@ int main(void)
         ALLMEMS1_PRINTF("ERROR: BootLoader NOT Compliant with FOTA procedure\r\n\n");
     }
     
+    InitFlashM();
+
     TargetBoardFeatures.LuxValue=0;
     BSP_LUX_Init();
     BSP_LUX_PowerON();
     
     PWM_Buzzer_Init();
-    /* Set Accelerometer Full Scale to 2G */
-    Set2GAccelerometerFullScale();
-    
-    /* Read the Acc Sensitivity */
-    BSP_ACCELERO_Get_Sensitivity(TargetBoardFeatures.HandleAccSensor,&sensitivity);
-    sensitivity_Mul = sensitivity * ((float) FROM_MG_TO_G);
     
     /* initialize timers */
     InitTimers();
@@ -492,9 +488,6 @@ int main(void)
     BSP_ULTRAVIOLET_Init(VEML6075_0, &TargetBoardFeatures.HandleUvSensor);
     EnvSensorsDisable();
     MotionSensorsDisable();
-    
-    AT25XE041B_Init();
-    AT25XE041B_EnterUltraDeepPowerDown();
     
     /* Infinite loop */
     uint32_t change_tick = HAL_GetTick() + BLUEMSYS_LED_ON_TIME;
@@ -824,9 +817,11 @@ int main(void)
 */
 void Set2GAccelerometerFullScale(void)
 {
-    /* Set Full Scale to +/-2g */
-    BSP_ACCELERO_Set_FS_Value(TargetBoardFeatures.HandleAccSensor,2.0f);
-    // BSP_ACCELERO_Set_FS_Value(TargetBoardFeatures.HandleAccSensor,8.0f);
+    uint16_t fs = 0;
+    uint16_t odr = 0;
+
+    FlashMemoryGetAccSett(&fs, &odr);
+    BSP_ACCELERO_Set_FS_Value(TargetBoardFeatures.HandleAccSensor, fs);
     
     /* Read the Acc Sensitivity */
     BSP_ACCELERO_Get_Sensitivity(TargetBoardFeatures.HandleAccSensor,&sensitivity);
@@ -962,9 +957,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 void EnvSensorsEnable(void)
-{    
-    BSP_HUMIDITY_Sensor_Enable(TargetBoardFeatures.HandleHumSensor);      
+{
+    float odr = 0;
+    BSP_HUMIDITY_Sensor_Enable(TargetBoardFeatures.HandleHumSensor);
+    FlashManagerGetHumTempSett(&odr);
+    BSP_HUMIDITY_Set_ODR_Value(TargetBoardFeatures.HandleHumSensor, odr);
     BSP_PRESSURE_Sensor_Enable(TargetBoardFeatures.HandlePressSensor);
+    FlashManagerGetPressureSett(&odr);
+    BSP_PRESSURE_Set_ODR_Value(TargetBoardFeatures.HandlePressSensor, odr);
     BSP_TEMPERATURE_Sensor_Enable(TargetBoardFeatures.HandleTempSensors[0]);
     BSP_TEMPERATURE_Sensor_Enable(TargetBoardFeatures.HandleTempSensors[1]);
 }
@@ -979,9 +979,28 @@ void EnvSensorsDisable(void)
 
 void MotionSensorsEnable(void)
 {
+    uint16_t fs = 0;
+    uint16_t odr = 0;
+    float odrMag = 0;
     BSP_ACCELERO_Sensor_Enable(TargetBoardFeatures.HandleAccSensor);
+    FlashMemoryGetAccSett(&fs, &odr);
+    BSP_ACCELERO_Set_FS_Value(TargetBoardFeatures.HandleAccSensor, fs);
+    BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor, odr);
+
     BSP_GYRO_Sensor_Enable(TargetBoardFeatures.HandleGyroSensor);
+    FlashMemoryGetGyroSett(&fs, &odr);
+    BSP_GYRO_Set_FS_Value(TargetBoardFeatures.HandleGyroSensor, fs);
+    BSP_GYRO_Set_ODR_Value(TargetBoardFeatures.HandleGyroSensor, odr);
+
     BSP_MAGNETO_Sensor_Enable(TargetBoardFeatures.HandleMagSensor);
+    FlashManagerGetMagSett((uint8_t*)&fs, &odrMag);
+    BSP_MAGNETO_Set_FS_Value(TargetBoardFeatures.HandleMagSensor, fs);
+    BSP_MAGNETO_Set_ODR_Value(TargetBoardFeatures.HandleMagSensor, odrMag);
+
+    /* Read the Acc Sensitivity */
+    BSP_ACCELERO_Get_Sensitivity(TargetBoardFeatures.HandleAccSensor,&sensitivity);
+    sensitivity_Mul = sensitivity * ((float) FROM_MG_TO_G);
+
 }
 
 void MotionSensorsDisable(void)

@@ -115,7 +115,7 @@ if QUAT_UPDATE_MUL_10MS!=3, then SEND_N_QUATERNIONS must be ==1
 /* Package Version only numbers 0->9 */
 #define ALLMEMS1_VERSION_MAJOR '3'
 #define ALLMEMS1_VERSION_MINOR '1'
-#define ALLMEMS1_VERSION_PATCH '0'
+#define ALLMEMS1_VERSION_PATCH '2'
 
 #ifdef USE_SENSIBLE
 /* Define the ALLMEMS1 Name MUST be 7 char long */
