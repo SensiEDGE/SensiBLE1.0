@@ -485,7 +485,9 @@ int main(void)
     VBAT_Init();
 #endif // defined(SENSIBLE_VBAT) && defined(USE_SENSIBLE)
     
+#if ENABLE_UV_SENSOR == 1
     BSP_ULTRAVIOLET_Init(VEML6075_0, &TargetBoardFeatures.HandleUvSensor);
+#endif
     EnvSensorsDisable();
     MotionSensorsDisable();
     
@@ -509,8 +511,9 @@ int main(void)
     
     while (1){
         if(HAL_GetTick() > uv_tick) {
-            static uint8_t uvcnt = 0;
             uv_tick = HAL_GetTick() + 100;//BLUEMSYS_UV_PERIOD;//
+#if ENABLE_UV_SENSOR == 1
+            static uint8_t uvcnt = 0;
             if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_UV)){
                 uint16_t uvVal = 0;
                 if(++uvcnt >= (BLUEMSYS_UV_PERIOD / 100)){
@@ -528,15 +531,13 @@ int main(void)
                     Co_Lux_Update(uvVal * 100, TargetBoardFeatures.LuxValue);
                 }
             }
+#endif
             
 #if 1
             if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_PROX)) {
                 if(BSP_DISTANCE_IsInitalized()){
                     uint16_t val = 0;
                     
-//                    while(COMPONENT_OK != BSP_DISTANCE_GetValue(&val)){
-//                        HAL_Delay(10);
-//                    }
                     if(COMPONENT_OK == BSP_DISTANCE_GetValue(&val))
                     {
                         if(val > 1200){
@@ -684,10 +685,13 @@ int main(void)
                 Timer_Reset(&TimerLux);
                 if (BSP_LUX_IsDataReady()) {
                     if (BSP_LUX_GetValue(&TargetBoardFeatures.LuxValue) == LUX_OK) {
-//                        Lux_Update(TargetBoardFeatures.LuxValue);
-                        uint16_t uvVal = 0;
+#if ENABLE_UV_SENSOR == 1
+                    	uint16_t uvVal = 0;
                         BSP_ULTRAVIOLET_Get_Uv(TargetBoardFeatures.HandleUvSensor, &uvVal);
                         Co_Lux_Update(uvVal * 100, TargetBoardFeatures.LuxValue);
+#else
+                        Lux_Update(TargetBoardFeatures.LuxValue);
+#endif
                     }
                 }
             }
@@ -1188,7 +1192,12 @@ static void MEMSCallback(void)
         BSP_ACCELERO_Get_Pedometer_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
             AccStepCount = GetStepHWPedometer();
-            AccEvent_Notify(AccStepCount, 2);
+        	AccEventSteps_Notify(ACC_PEDOMETER, AccStepCount);
+
+            if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_PEDOMETER)) {
+				//Only for ST BLE Sensor Classic
+            	AccEventSteps_Notifi(AccStepCount);
+			}
         }
     }
     
@@ -1197,7 +1206,12 @@ static void MEMSCallback(void)
     {
         BSP_ACCELERO_Get_Free_Fall_Detection_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
-            AccEvent_Notify(ACC_FREE_FALL, 2);
+        	AccEventSteps_Notify(ACC_FREE_FALL, GetStepHWPedometer());
+
+            if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_FREE_FALL)) {
+    			//Only for ST BLE Sensor Classic
+                AccEvent_Notifi(ACC_FREE_FALL);
+            }
         }
         
     }
@@ -1207,7 +1221,12 @@ static void MEMSCallback(void)
     {
         BSP_ACCELERO_Get_Single_Tap_Detection_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
-            AccEvent_Notify(ACC_SINGLE_TAP, 2);
+        	AccEventSteps_Notify(ACC_SINGLE_TAP, GetStepHWPedometer());
+
+            if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_SINGLE_TAP)) {
+    			//Only for ST BLE Sensor Classic
+                AccEvent_Notifi(ACC_SINGLE_TAP);
+            }
         }
     }
     
@@ -1217,7 +1236,12 @@ static void MEMSCallback(void)
         /* Check if the interrupt is due to Double Tap */
         BSP_ACCELERO_Get_Double_Tap_Detection_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
-            AccEvent_Notify(ACC_DOUBLE_TAP, 2);
+        	AccEventSteps_Notify(ACC_DOUBLE_TAP, GetStepHWPedometer());
+
+            if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_DOUBLE_TAP)) {
+    			//Only for ST BLE Sensor Classic
+                AccEvent_Notifi(ACC_DOUBLE_TAP);
+            }
         }
     }
     
@@ -1227,7 +1251,12 @@ static void MEMSCallback(void)
         /* Check if the interrupt is due to Tilt */
         BSP_ACCELERO_Get_Tilt_Detection_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
-            AccEvent_Notify(ACC_TILT, 2);
+        	AccEventSteps_Notify(ACC_TILT, GetStepHWPedometer());
+
+            if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_TILT)) {
+				//Only for ST BLE Sensor Classic
+            	AccEvent_Notifi(ACC_TILT);
+			}
         }
     }
     
@@ -1238,7 +1267,12 @@ static void MEMSCallback(void)
         BSP_ACCELERO_Get_6D_Orientation_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
             AccEventType Orientation = GetHWOrientation6D();
-            AccEvent_Notify(Orientation, 2);
+
+            AccEventSteps_Notify(Orientation, GetStepHWPedometer());
+			if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_6DORIENTATION)) {
+				//Only for ST BLE Sensor Classic
+				AccEvent_Notifi(Orientation);
+			}
         }
     }
     
@@ -1246,14 +1280,13 @@ static void MEMSCallback(void)
         /* Check if the interrupt is due to Wake Up */
         BSP_ACCELERO_Get_Wake_Up_Detection_Status_Ext(TargetBoardFeatures.HandleAccSensor,&stat);
         if(stat) {
-            AccEvent_Notify(ACC_WAKE_UP, 2);
+        	AccEventSteps_Notify(ACC_WAKE_UP, GetStepHWPedometer());
+
+            if (W2ST_CHECK_HW_FEATURE(W2ST_HWF_WAKE_UP)) {
+    			//Only for ST BLE Sensor Classic
+                AccEvent_Notifi(ACC_WAKE_UP);
+            }
         }
-    }
-    
-    if(W2ST_CHECK_HW_FEATURE(W2ST_HWF_MULTIPLE_EVENTS))
-    {
-        // AccStepCount = GetStepHWPedometer();
-        AccEvent_Notify(AccStepCount, 3);
     }
 }
 

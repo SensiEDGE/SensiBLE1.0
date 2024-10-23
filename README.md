@@ -1,12 +1,14 @@
 # **SensiBLE-1.0**
 
 ## 1 Build
-For build can be used [IAR ver. EWARM-CD-8222-15996](https://www.iar.com/) or [STM32CubeIDE](https://www.st.com/en/development-tools/stm32cubeide.html).
-Relevant projects can be found in [Projects/Multi/Applications/ALLMEMS1/EWARM/STM32L476RG-Nucleo](Projects/Multi/Applications/ALLMEMS1/EWARM/STM32L476RG-Nucleo) and [Projects/Multi/Applications/ALLMEMS1/CubeIDE/STM32L476RG-Nucleo/STM32L4xx-Nucleo](Projects/Multi/Applications/ALLMEMS1/CubeIDE/STM32L476RG-Nucleo/STM32L4xx-Nucleo).
+For build [STM32CubeIDE Version: 1.14.0(https://www.st.com/en/development-tools/stm32cubeide.html)] is used.
 
-## 2 License
+## 2 Firmware V3.1.3
+- Add support Acc Event for new app ST BLE Sensor
 
-**COPYRIGHT(c) 2019 SensiEDGE LTD**
+## 3 License
+
+**COPYRIGHT(c) 2024 SensiEDGE **
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -15,7 +17,7 @@ are permitted provided that the following conditions are met:
   2. Redistributions in binary form must reproduce the above copyright notice,
      this list of conditions and the following disclaimer in the documentation
      and/or other materials provided with the distribution.
-  3. Neither the name of SensiEDGE LTD nor the names of its contributors may
+  3. Neither the name of SensiEDGE nor the names of its contributors may
      be used to endorse or promote products derived from this software
      without specific prior written permission.
      

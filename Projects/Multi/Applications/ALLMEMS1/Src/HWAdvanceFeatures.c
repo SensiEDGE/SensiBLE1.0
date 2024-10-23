@@ -134,8 +134,14 @@ void EnableHWOrientation6D(void)
       ALLMEMS1_PRINTF("Error Enabling 6D Orientation\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled 6D Orientation\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_6DORIENTATION);
     }
+
+    AccEventType orientation = GetHWOrientation6D();
+    HAL_Delay(10);
+    AccEventSteps_Notify(orientation, GetStepHWPedometer());
+    //Only for ST BLE Sensor Classic
+    HAL_Delay(10);
+	AccEvent_Notifi(orientation);
   }
 }
 
@@ -152,9 +158,9 @@ void DisableHWOrientation6D(void)
       ALLMEMS1_PRINTF("Error Disabling 6D Orientation\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled 6D Orientation\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_6DORIENTATION);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_6DORIENTATION);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -236,7 +242,6 @@ void EnableHWTilt(void)
       ALLMEMS1_PRINTF("Error Enabling Tilt Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled Tilt\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_TILT);
     }
   }
 }
@@ -254,9 +259,9 @@ void DisableHWTilt(void)
       ALLMEMS1_PRINTF("Error Disabling Tilt Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled Tilt\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_TILT);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_TILT);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -280,7 +285,6 @@ void EnableHWWakeUp(void)
       ALLMEMS1_PRINTF("Error Enabling Wake Up Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled Wake Up\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_WAKE_UP);
     }
   }
 }
@@ -298,9 +302,9 @@ void DisableHWWakeUp(void)
       ALLMEMS1_PRINTF("Error Disabling Wake Up Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled Wake Up\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_WAKE_UP);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_WAKE_UP);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -323,7 +327,6 @@ void EnableHWFreeFall(void)
       ALLMEMS1_PRINTF("Error Enabling Free Fall Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled Free Fall\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_FREE_FALL);
     }
     
 #ifdef STM32_NUCLEO
@@ -355,9 +358,9 @@ void DisableHWFreeFall(void)
       ALLMEMS1_PRINTF("Error Disabling Free Fall Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled Free Fall\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_FREE_FALL);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_FREE_FALL);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -380,7 +383,6 @@ void EnableHWDoubleTap(void)
       ALLMEMS1_PRINTF("Error Enabling Double Tap Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled Double Tap\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_DOUBLE_TAP);
     }
     
 #ifdef STM32_NUCLEO
@@ -412,9 +414,9 @@ void DisableHWDoubleTap(void)
       ALLMEMS1_PRINTF("Error Disabling Double Tap Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled Double Tap\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_DOUBLE_TAP);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_DOUBLE_TAP);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -437,7 +439,6 @@ void EnableHWSingleTap(void)
       ALLMEMS1_PRINTF("Error Enabling Single Tap Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled Sigle Tap\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_SINGLE_TAP);
     }
   }
 }
@@ -455,9 +456,9 @@ void DisableHWSingleTap(void)
       ALLMEMS1_PRINTF("Error Disabling Single Tap Detection\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled Sigle Tap\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_SINGLE_TAP);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_SINGLE_TAP);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -483,7 +484,6 @@ void EnableHWPedometer(void)
       ALLMEMS1_PRINTF("Error Enabling Pedometer\r\n");
     } else {
       ALLMEMS1_PRINTF("Enabled Pedometer\r\n");
-      W2ST_ON_HW_FEATURE(W2ST_HWF_PEDOMETER);
     }
   }
 }
@@ -500,9 +500,9 @@ void DisableHWPedometer(void)
       ALLMEMS1_PRINTF("Error Disabling Pedometer\r\n");
     } else {
       ALLMEMS1_PRINTF("Disabled Pedometer\r\n");
-      W2ST_OFF_HW_FEATURE(W2ST_HWF_PEDOMETER);
     }
 
+    W2ST_OFF_HW_FEATURE(W2ST_HWF_PEDOMETER);
     /* Set the Output Data Rate to Default value */
     BSP_ACCELERO_Set_ODR_Value(TargetBoardFeatures.HandleAccSensor,DefaultAccODR);
   }
@@ -563,9 +563,9 @@ void EnableHWMultipleEvents(void)
   EnableHWOrientation6D();
   
   AccStepCount=0;
-  AccEvent_Notify(AccStepCount, 3);
-   
-  W2ST_ON_HW_FEATURE(W2ST_HWF_MULTIPLE_EVENTS);
+  AccEventSteps_Notify(ACC_PEDOMETER, AccStepCount);
+  //Only for ST BLE Sensor Classic
+  AccEventSteps_Notifi(AccStepCount);
 }
 
 /**

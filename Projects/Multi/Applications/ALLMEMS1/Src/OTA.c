@@ -141,7 +141,7 @@ int8_t CheckBootLoaderCompliance(void)
     return 0;
   }
 
-  OTA_PRINTF("\tMaxSize =%x\r\n",BootLoaderFeatures->OTAMaxSize);
+  OTA_PRINTF("\tMaxSize =%lu\r\n", BootLoaderFeatures->OTAMaxSize);
 
   if(BootLoaderFeatures->OTAStartAdd==(OTA_ADDRESS_START-8)) {
     OTA_PRINTF("\tOK\r\n");

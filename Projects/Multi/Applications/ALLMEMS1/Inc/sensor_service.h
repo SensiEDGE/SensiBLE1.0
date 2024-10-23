@@ -60,6 +60,7 @@
 #include "hal.h"
 #include "sm.h"
 #include "debug.h"
+#include "uuid_ble_service.h"
 
 #include <stdlib.h>
 #include "main.h"
@@ -67,7 +68,9 @@
 /* Exported functions ------------------------------------------------------- */
 extern tBleStatus Add_HW_SW_ServW2ST_Service(void);
 extern tBleStatus AccGyroMag_Update(SensorAxes_t *Acc,SensorAxes_t *Gyro,SensorAxes_t *Mag);
-extern tBleStatus AccEvent_Notify(uint16_t Command, uint8_t dimByte);
+extern tBleStatus AccEvent_Notifi(uint8_t event);
+extern tBleStatus AccEventSteps_Notify(uint8_t event, uint16_t steps);
+extern tBleStatus AccEventSteps_Notifi(uint16_t steps);
 extern tBleStatus Environmental_Update(int32_t Press,uint16_t Hum,int16_t Temp2,int16_t Temp1);
 
 /* Code for MotionFX integration - Start Section */
@@ -79,10 +82,12 @@ extern tBleStatus AudioLevel_Update(uint16_t *Mic);
 
 extern tBleStatus LED_Update(uint8_t LedStatus);
 extern tBleStatus Prox_Update(uint16_t ProxValue);
-//extern tBleStatus Lux_Update(uint16_t LuxValue);
+#if ENABLE_UV_SENSOR == 1
 extern tBleStatus Uv_Update(uint16_t UvValue);
-//extern tBleStatus Co_Update(uint32_t CoValue);
 extern tBleStatus Co_Lux_Update(uint32_t CoValue, uint16_t LuxValue);
+#else
+extern tBleStatus Lux_Update(uint16_t LuxValue);
+#endif
 
 #ifdef USE_SENSIBLE
 extern tBleStatus BAT_Update(uint16_t soc, uint16_t voltage, uint16_t current, uint8_t status);

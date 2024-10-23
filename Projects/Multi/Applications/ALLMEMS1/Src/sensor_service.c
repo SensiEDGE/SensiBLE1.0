@@ -43,7 +43,6 @@
 #include "HWAdvanceFeatures.h"
 #include "bluenrg_utils.h"
 #include "bluenrg_l2cap_aci.h"
-#include "uuid_ble_service.h"
 #include "hci_le.h"
 #include "OTA.h"
 #include "simba_lux.h"
@@ -53,6 +52,8 @@
 #endif // defined(SENSIBLE_VBAT) && defined(USE_SENSIBLE)
 #include "sensible_distance.h"
 #include "FlashManager.h"
+
+
 
 /* Exported variables ---------------------------------------------------------*/
 int connected = FALSE;
@@ -119,12 +120,16 @@ static uint16_t HWServW2STHandle;
 static uint16_t EnvironmentalCharHandle;
 static uint16_t AccGyroMagCharHandle;
 static uint16_t AccEventCharHandle;
-//static uint16_t CoEventCharHandle;
 static uint16_t AudioLevelCharHandle;
 static uint16_t LedCharHandle;
 static uint16_t ProxCharHandle;
-//static uint16_t LuxCharHandle;
+
+#if ENABLE_UV_SENSOR == 1
 static uint16_t Co_LuxCharHandle;
+#else
+static uint16_t LuxCharHandle;
+#endif
+
 static uint16_t UvCharHandle;
 
 #if defined(SENSIBLE_VBAT) && defined(USE_SENSIBLE)
@@ -322,7 +327,7 @@ tBleStatus Add_ConsoleW2ST_Service(void)
   return BLE_STATUS_SUCCESS;
 
 fail:
-  //ALLMEMS1_PRINTF("Error while adding Console service.\n");
+  ALLMEMS1_PRINTF("Error while adding Console service.\n");
   return BLE_STATUS_ERROR;
 }
 
@@ -640,42 +645,57 @@ tBleStatus Config_Notify(uint32_t Feature,uint8_t Command,uint8_t data)
   return BLE_STATUS_SUCCESS;
 }
 
+
 /**
  * @brief  Send a notification When the DS3 detects one Acceleration event
- * @param  Command to Send
+ * @param  Acceleration event and steps to Send
  * @retval tBleStatus Status
  */
-tBleStatus AccEvent_Notify(uint16_t Command, uint8_t dimByte)
+tBleStatus AccEventSteps_Notify(uint8_t event, uint16_t steps)
 {
-  tBleStatus ret= BLE_STATUS_SUCCESS;
-  uint8_t buff_2[2+2];
-  uint8_t buff_3[2+3];
-  
-  switch(dimByte)
-  {
-  case 2:
-    STORE_LE_16(buff_2  ,(HAL_GetTick()>>3));
-    STORE_LE_16(buff_2+2,Command);
-    ret = aci_gatt_update_char_value(HWServW2STHandle, AccEventCharHandle, 0, 2+2,buff_2);
-    break;
-  case 3:
-    STORE_LE_16(buff_3  ,(HAL_GetTick()>>3));
-    buff_3[2]= 0;
-    STORE_LE_16(buff_3+3,Command);
-    ret = aci_gatt_update_char_value(HWServW2STHandle, AccEventCharHandle, 0, 2+3,buff_3);
-    break;
-  }
-  
-  if (ret != BLE_STATUS_SUCCESS){
-    if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_ERR)){
-      BytesToWrite =sprintf((char *)BufferToWrite, "Error Updating AccEvent_Notify Char (0x%X)\r\n", ret);
-      Stderr_Update(BufferToWrite,BytesToWrite);
-    } else {
-      ALLMEMS1_PRINTF("Error Updating AccEvent_Notify Char (0x%X)\r\n", ret);
-    }
-    return BLE_STATUS_ERROR;
-  }
-  return BLE_STATUS_SUCCESS;
+    tBleStatus ret= BLE_STATUS_SUCCESS;
+    uint8_t buff[2+3] = {0};
+
+	STORE_LE_16(buff, (HAL_GetTick()>>3));
+	buff[2]= event;
+	STORE_LE_16(buff+3,steps);
+	ret = aci_gatt_update_char_value(HWServW2STHandle, AccEventCharHandle, 0, sizeof(buff),buff);
+
+    return ret;
+}
+
+/**
+ * @brief  Send a steps When the DS3 detects
+ * @param  Steps to Send
+ * @retval tBleStatus Status
+ */
+tBleStatus AccEvent_Notifi(uint8_t event)
+{
+	tBleStatus ret= BLE_STATUS_SUCCESS;
+	uint8_t buff[2+1] = {0};
+
+	STORE_LE_16(buff, (HAL_GetTick()>>3));
+	buff[2]= event;
+	ret = aci_gatt_update_char_value(HWServW2STHandle, AccEventCharHandle, 0, sizeof(buff),buff);
+
+	return ret;
+}
+
+/**
+ * @brief  Send a steps When the DS3 detects
+ * @param  Steps to Send
+ * @retval tBleStatus Status
+ */
+tBleStatus AccEventSteps_Notifi(uint16_t steps)
+{
+	tBleStatus ret= BLE_STATUS_SUCCESS;
+	uint8_t buff[2+2] = {0};
+
+	STORE_LE_16(buff, (HAL_GetTick()>>3));
+	STORE_LE_16(buff+2,steps);
+	ret = aci_gatt_update_char_value(HWServW2STHandle, AccEventCharHandle, 0, sizeof(buff),buff);
+
+	return ret;
 }
 
 /**
@@ -797,17 +817,6 @@ tBleStatus Add_HW_SW_ServW2ST_Service(void)
     goto fail;
   }
   
-//  COPY_CO_W2ST_CHAR_UUID(uuid);
-//  ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, uuid, 2+4,// 2+2,
-//                           CHAR_PROP_NOTIFY | CHAR_PROP_READ,
-//                           ATTR_PERMISSION_NONE,
-//                           GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
-//                           16, 0, &CoEventCharHandle);
-//
-//  if (ret != BLE_STATUS_SUCCESS) {
-//    goto fail;
-//  }
-
   COPY_MIC_W2ST_CHAR_UUID(uuid);
   ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, uuid,2+AUDIO_CHANNELS,
                            CHAR_PROP_NOTIFY,
@@ -950,17 +959,9 @@ tBleStatus Add_HW_SW_ServW2ST_Service(void)
     goto fail;
   }
 
-//  COPY_LUX_W2ST_CHAR_UUID(uuid);
-//  ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, uuid, 2+2,
-//                           CHAR_PROP_NOTIFY|CHAR_PROP_READ,
-//                           ATTR_PERMISSION_NONE,
-//                           GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
-//                           16, 0, &LuxCharHandle);
-//
-//  if (ret != BLE_STATUS_SUCCESS) {
-//    goto fail;
-//  }
+
   
+#if ENABLE_UV_SENSOR == 1
   COPY_CO_LUX_W2ST_CHAR_UUID(uuid);
   ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, uuid, 2+2+4,
                            CHAR_PROP_NOTIFY|CHAR_PROP_READ,
@@ -971,7 +972,19 @@ tBleStatus Add_HW_SW_ServW2ST_Service(void)
   if (ret != BLE_STATUS_SUCCESS) {
     goto fail;
   }
-  
+#else
+  COPY_LUX_W2ST_CHAR_UUID(uuid);
+  ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, uuid, 2+2,
+                           CHAR_PROP_NOTIFY|CHAR_PROP_READ,
+                           ATTR_PERMISSION_NONE,
+                           GATT_NOTIFY_READ_REQ_AND_WAIT_FOR_APPL_RESP,
+                           16, 0, &LuxCharHandle);
+
+  if (ret != BLE_STATUS_SUCCESS) {
+    goto fail;
+  }
+#endif
+
   COPY_UV_W2ST_CHAR_UUID(uuid);
   ret =  aci_gatt_add_char(HWServW2STHandle, UUID_TYPE_128, uuid, 2+2,
                            CHAR_PROP_NOTIFY|CHAR_PROP_READ,
@@ -1339,34 +1352,7 @@ tBleStatus Prox_Update(uint16_t ProxValue)
   return BLE_STATUS_SUCCESS;
 }
 
-///**
-// * @brief  Update LLux characteristic value
-// * @param  uint16_t Value in Lux
-// * @retval tBleStatus   Status
-// */
-//tBleStatus Lux_Update(uint16_t LuxValue)
-//{
-//  tBleStatus ret;
-//
-//  uint8_t buff[2+2];
-//
-//  STORE_LE_16(buff  ,(HAL_GetTick()>>3));
-//  STORE_LE_16(buff+2,LuxValue);
-//
-//  ret = ACI_GATT_UPDATE_CHAR_VALUE(HWServW2STHandle, LuxCharHandle, 0, 2+2,buff);
-//
-//  if (ret != BLE_STATUS_SUCCESS){
-//    if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_ERR)){
-//      BytesToWrite = sprintf((char *)BufferToWrite, "Error Updating Lux Char\r\n");
-//      Stderr_Update(BufferToWrite,BytesToWrite);
-//    } else {
-//      printf("Error Updating Lux Char\r\n");
-//    }
-//    return BLE_STATUS_ERROR;
-//  }
-//  return BLE_STATUS_SUCCESS;
-//}
-
+#if ENABLE_UV_SENSOR == 1
 /**
  * @brief  Update CO & Lux characteristic value
  * @param  uint16_t Value in Lux
@@ -1395,6 +1381,35 @@ tBleStatus Co_Lux_Update(uint32_t CoValue, uint16_t LuxValue)
   }
   return BLE_STATUS_SUCCESS;
 }
+#else
+/**
+ * @brief  Update LLux characteristic value
+ * @param  uint16_t Value in Lux
+ * @retval tBleStatus   Status
+ */
+tBleStatus Lux_Update(uint16_t LuxValue)
+{
+  tBleStatus ret;
+
+  uint8_t buff[2+2];
+
+  STORE_LE_16(buff  ,(HAL_GetTick()>>3));
+  STORE_LE_16(buff+2,LuxValue);
+
+  ret = ACI_GATT_UPDATE_CHAR_VALUE(HWServW2STHandle, LuxCharHandle, 0, 2+2,buff);
+
+  if (ret != BLE_STATUS_SUCCESS){
+    if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_ERR)){
+      BytesToWrite = sprintf((char *)BufferToWrite, "Error Updating Lux Char\r\n");
+      Stderr_Update(BufferToWrite,BytesToWrite);
+    } else {
+      printf("Error Updating Lux Char\r\n");
+    }
+    return BLE_STATUS_ERROR;
+  }
+  return BLE_STATUS_SUCCESS;
+}
+#endif
 
 tBleStatus Uv_Update(uint16_t UvValue)
 { 
@@ -1454,31 +1469,6 @@ tBleStatus ConfigSensor_Update(void)
     return BLE_STATUS_SUCCESS;
 }
 
-
-//tBleStatus Co_Update(uint32_t CoValue)
-//{ 
-//  tBleStatus ret;
-//
-//  uint8_t buff[2+4];
-//
-//  STORE_LE_16(buff  ,(HAL_GetTick()>>3));
-//  STORE_LE_32(buff+2,CoValue);
-////  STORE_LE_16(buff+2,CoValue);
-//
-//  ret = ACI_GATT_UPDATE_CHAR_VALUE(HWServW2STHandle, CoEventCharHandle, 0, sizeof(buff),buff);
-//
-//  if (ret != BLE_STATUS_SUCCESS){
-//    if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_ERR)){
-//      BytesToWrite = sprintf((char *)BufferToWrite, "Error Updating Co Char\r\n");
-//      Stderr_Update(BufferToWrite,BytesToWrite);
-//    } else {
-//      printf("Error Updating Co Char\r\n");
-//    }
-//    return BLE_STATUS_ERROR;
-//  }
-//  return BLE_STATUS_SUCCESS;  
-//}
-
 /**
  * @brief  Puts the device in connectable mode.
  * @param  None
@@ -1505,7 +1495,7 @@ void setConnectable(void)
     7/*13*/,0xFF,0x01/*SKD version */,
 #ifdef  STM32_NUCLEO
 #ifdef SENSIBLE_VBAT
-    0x82, // 0x02,
+    0x80, // 0x02,
 #else
     0x80,
 #endif // SENSIBLE_VBAT
@@ -1898,13 +1888,6 @@ void Read_Request_CB(uint16_t handle)
         Temp1ToSend = intPart*10+decPart;
       }
     }
-#if 0 // Enable or disable sending UV value instead of Temp2
-      // This block of code writes UV sensors value instead of Temp2
-#warning "UV sensor was added here"
-    uint16_t uvVal = 0;
-    BSP_ULTRAVIOLET_Get_Uv(TargetBoardFeatures.HandleUvSensor, &uvVal);
-    Temp2ToSend = (int16_t) uvVal;
-#endif
     Environmental_Update(PressToSend,HumToSend,Temp2ToSend,Temp1ToSend);
 
   } else if(handle == LedCharHandle + 1){
@@ -1912,17 +1895,19 @@ void Read_Request_CB(uint16_t handle)
     LED_Update(TargetBoardFeatures.Led1Status);
   }
   
-//  else if (handle == LuxCharHandle + 1) {
-//    Lux_Update(TargetBoardFeatures.LuxValue);
-//
-//  }
+#if ENABLE_UV_SENSOR == 1
   else if (handle == Co_LuxCharHandle + 1) {
     //Here send only lux value
     uint16_t uvVal = 0;
     BSP_ULTRAVIOLET_Get_Uv(TargetBoardFeatures.HandleUvSensor, &uvVal);
     Co_Lux_Update(uvVal*100, TargetBoardFeatures.LuxValue);
   }
-  
+#else
+  else if (handle == LuxCharHandle + 1) {
+    Lux_Update(TargetBoardFeatures.LuxValue);
+
+  }
+#endif
   else if(handle == AccEventCharHandle +1) {
     /* Read Request for Acc Pedometer DS3 */
     if(TargetBoardFeatures.HWAdvanceFeatures){
@@ -1932,7 +1917,9 @@ void Read_Request_CB(uint16_t handle)
       } else {
         StepCount = 0;
       }
-      AccEvent_Notify(StepCount, 2);
+      AccEventSteps_Notify(ACC_PEDOMETER, StepCount);
+      //Only for ST BLE Sensor Classic
+      AccEventSteps_Notifi(StepCount);
     }
   } else if (handle == StdErrCharHandle + 1) {
     /* Send again the last packet for StdError */
@@ -2358,9 +2345,6 @@ void Attribute_Modified_CB(uint16_t attr_handle, uint8_t * att_data, uint8_t dat
     if (att_data[0] == 01) {
       // MotionSensorsEnable();
       W2ST_ON_CONNECTION(W2ST_CONNECT_ACC_EVENT);
-      // Enable multiple events because sometimes
-      // they are not enabled by the Android app.
-      EnableHWMultipleEvents();
       ResetHWPedometer();
     } else if (att_data[0] == 0) {
       // MotionSensorsDisable();
@@ -2474,58 +2458,52 @@ void Attribute_Modified_CB(uint16_t attr_handle, uint8_t * att_data, uint8_t dat
       W2ST_OFF_CONNECTION(W2ST_CONNECT_UV);
     }
   } 
-//  else if (attr_handle == CoEventCharHandle + 2) {
-//    if (att_data[0] == 01) {
-//      W2ST_ON_CONNECTION(W2ST_CONNECT_CO);
-//    } else if (att_data[0] == 0){
-//      W2ST_OFF_CONNECTION(W2ST_CONNECT_CO);
-//    }
-//  } 
-  
-//  else if (attr_handle == LuxCharHandle + 2) {
-//    if (att_data[0] == 01) {
-//      BSP_LUX_PowerON();
-//      Timer_Set(&TimerLux, 500);        /* TBD: move interval somewhere in defines */
-//      W2ST_ON_CONNECTION(W2ST_CONNECT_LUX);
-//      /* Update the LUX feature */
-//      // Lux_Update(TargetBoardFeatures.LuxValue);
-//    } else if (att_data[0] == 0){
-//      W2ST_OFF_CONNECTION(W2ST_CONNECT_LUX);
-//      BSP_LUX_PowerOFF();
-//    }
-//#ifdef OSX_BMS_DEBUG_CONNECTION
-//    if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_TERM)) {
-//      BytesToWrite =sprintf((char *)BufferToWrite,"--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
-//     Term_Update(BufferToWrite,BytesToWrite);
-//    } else
-//      //OSX_BMS_PRINTF("--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
-//#endif /* OSX_BMS_DEBUG_CONNECTION */
-//  } 
-  
-    else if (attr_handle == Co_LuxCharHandle + 2) {
-    if (att_data[0] == 01) {
-      BSP_LUX_PowerON();
-      BSP_ULTRAVIOLET_Sensor_Enable(TargetBoardFeatures.HandleUvSensor);
-      Timer_Set(&TimerLux, 500);        /* TBD: move interval somewhere in defines */
-      W2ST_ON_CONNECTION(W2ST_CONNECT_LUX);
-      W2ST_ON_CONNECTION(W2ST_CONNECT_CO);
-      /* Update the LUX feature */
-      // Lux_Update(TargetBoardFeatures.LuxValue);
-    } else if (att_data[0] == 0){
-      W2ST_OFF_CONNECTION(W2ST_CONNECT_LUX);
-      W2ST_OFF_CONNECTION(W2ST_CONNECT_CO);
-      BSP_LUX_PowerOFF();
-      BSP_ULTRAVIOLET_Sensor_Disable(TargetBoardFeatures.HandleUvSensor);
-    }
-#ifdef OSX_BMS_DEBUG_CONNECTION
-    if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_TERM)) {
-      BytesToWrite =sprintf((char *)BufferToWrite,"--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
-     Term_Update(BufferToWrite,BytesToWrite);
-    } else
-      //OSX_BMS_PRINTF("--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
-#endif /* OSX_BMS_DEBUG_CONNECTION */
+
+#if ENABLE_UV_SENSOR == 1
+  else if (attr_handle == Co_LuxCharHandle + 2) {
+  if (att_data[0] == 01) {
+    BSP_LUX_PowerON();
+    BSP_ULTRAVIOLET_Sensor_Enable(TargetBoardFeatures.HandleUvSensor);
+    Timer_Set(&TimerLux, 500);        /* TBD: move interval somewhere in defines */
+    W2ST_ON_CONNECTION(W2ST_CONNECT_LUX);
+    W2ST_ON_CONNECTION(W2ST_CONNECT_CO);
+    /* Update the LUX feature */
+    // Lux_Update(TargetBoardFeatures.LuxValue);
+  } else if (att_data[0] == 0){
+    W2ST_OFF_CONNECTION(W2ST_CONNECT_LUX);
+    W2ST_OFF_CONNECTION(W2ST_CONNECT_CO);
+    BSP_LUX_PowerOFF();
+    BSP_ULTRAVIOLET_Sensor_Disable(TargetBoardFeatures.HandleUvSensor);
   }
-  
+#ifdef OSX_BMS_DEBUG_CONNECTION
+  if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_TERM)) {
+    BytesToWrite =sprintf((char *)BufferToWrite,"--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
+   Term_Update(BufferToWrite,BytesToWrite);
+  } else
+    //OSX_BMS_PRINTF("--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
+#endif /* OSX_BMS_DEBUG_CONNECTION */
+}
+#else
+else if (attr_handle == LuxCharHandle + 2) {
+  if (att_data[0] == 01) {
+    BSP_LUX_PowerON();
+    Timer_Set(&TimerLux, 500);        /* TBD: move interval somewhere in defines */
+    W2ST_ON_CONNECTION(W2ST_CONNECT_LUX);
+    /* Update the LUX feature */
+    // Lux_Update(TargetBoardFeatures.LuxValue);
+  } else if (att_data[0] == 0){
+    W2ST_OFF_CONNECTION(W2ST_CONNECT_LUX);
+    BSP_LUX_PowerOFF();
+  }
+#ifdef OSX_BMS_DEBUG_CONNECTION
+  if(W2ST_CHECK_CONNECTION(W2ST_CONNECT_STD_TERM)) {
+    BytesToWrite =sprintf((char *)BufferToWrite,"--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
+   Term_Update(BufferToWrite,BytesToWrite);
+  } else
+    //OSX_BMS_PRINTF("--->Lux=%d\r\n", TargetBoardFeatures.LuxValue);
+#endif /* OSX_BMS_DEBUG_CONNECTION */
+}
+#endif
   else if (attr_handle == AudioLevelCharHandle + 2) {
     //uint8_t ret;
     if (att_data[0] == 01) {
@@ -2901,6 +2879,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
         case FEATURE_MASK_LED_SWITCH:
             if(TargetBoardFeatures.Led1Status == 0) {
               Led1OnTargetPlatform();
+              PWM_Buzzer_Beep();
             } else {
               Led1OffTargetPlatform();
               PWM_Buzzer_Beep();
@@ -3036,6 +3015,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
             EnableHWMultipleEvents();
             ResetHWPedometer();
             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_MULTIPLE_EVENTS);
             break;
           case 0:
             DisableHWMultipleEvents();
@@ -3048,7 +3028,8 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
         switch(Data) {
           case 1:
             EnableHWFreeFall();
-             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_FREE_FALL);
             break;
           case 0:
             DisableHWFreeFall();
@@ -3062,6 +3043,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
           case 1:
             EnableHWDoubleTap();
             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_DOUBLE_TAP);
             break;
           case 0:
             DisableHWDoubleTap();
@@ -3075,6 +3057,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
           case 1:
             EnableHWSingleTap();
             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_SINGLE_TAP);
             break;
           case 0:
             DisableHWSingleTap();
@@ -3089,6 +3072,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
             EnableHWPedometer();
             ResetHWPedometer();
             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_PEDOMETER);
             break;
           case 0:
             DisableHWPedometer();
@@ -3102,6 +3086,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
           case 1:
             EnableHWWakeUp();
             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_WAKE_UP);
             break;
           case 0:
             DisableHWWakeUp();
@@ -3115,6 +3100,7 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
           case 1:
             EnableHWTilt();
             Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+            W2ST_ON_HW_FEATURE(W2ST_HWF_TILT);
             break;
           case 0:
             DisableHWTilt();
@@ -3126,8 +3112,9 @@ static uint32_t ConfigCommandParsing(uint8_t * att_data, uint8_t data_length)
         /* Tilt */
         switch(Data) {
         case 1:
-          EnableHWOrientation6D();
           Config_Notify(FEATURE_MASK_ACC_EVENTS,Command,Data);
+          W2ST_ON_HW_FEATURE(W2ST_HWF_6DORIENTATION);
+          EnableHWOrientation6D();
           break;
         case 0:
           DisableHWOrientation6D();
